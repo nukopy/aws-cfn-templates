@@ -46,14 +46,14 @@ Now, you can deploy AWS resources using deploy scripts in this repository.
     - Public Subnet 2
     - Private Subnet 2
 
-Execute deploy script as following:
+Execute the deploy script as following:
 
 ```sh
 cd aws-cfn-templates/
 sh ./scripts/deploy-vpc.sh
 ```
 
-In the VPC page of the AWS console, you can make sure VPC settings: VPC, Public / Private Subnet associated with Route Table.
+In the VPC page of the AWS console, you can make sure VPC settings are successful: VPC, Public / Private Subnet associated with Route Table.
 
 ### Amazon VPC + Amazon EC2
 
@@ -68,7 +68,7 @@ TODO
 - Architecture
   - ECR Repository
 
-Execute deploy script as following:
+Execute the deploy script as following:
 
 ```sh
 sh ./scripts/deploy-ecr.sh
