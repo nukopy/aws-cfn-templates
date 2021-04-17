@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Stack for Metheus
+Parameters:
+  # project parameters
+  ProjectName:
+    Type: String
+    Description: Project name
+    Default: test-app
+  Env:
+    Type: String
+    Description: Environment like "dev", "staging", "production"
+    Default: dev
+  # Network
+  # - VPC
+  VpcCidrBlock:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.0.0/16
+  # - VPC Subnet
+  PublicSubnetCidrBlock1:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.1.0/24
+  PublicSubnetCidrBlock2:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.2.0/24
+  PrivateSubnetCidrBlock1:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.3.0/24
+  PrivateSubnetCidrBlock2:
+    Type: String
+    Description: Optional - CIDR/IP range for the VPC
+    Default: 10.0.4.0/24
+Resources:
+  ########################################
+  # Network
+  ########################################
+
+  # VPC
+  TestAppVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref "VpcCidrBlock"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${Env}-vpc
+
+  # Subnet
+  # Subnet on AZ-1
+  TestAppPublicSubnetAz1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      CidrBlock: !Ref "PublicSubnetCidrBlock1"
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      MapPublicIpOnLaunch: true # サブネット内のインスタンスに public IP を自動割り当てするか
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-public-subnet-az1
+        - Key: "Description"
+          Value: Private Subnet on AZ-1
+  TestAppPrivateSubnetAz1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      CidrBlock: !Ref "PrivateSubnetCidrBlock1"
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      MapPublicIpOnLaunch: true # サブネット内のインスタンスに public IP を自動割り当てするか
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-private-subnet-az1
+        - Key: "Description"
+          Value: Private Subnet on AZ-1
+  # Subnet on AZ-2
+  TestAppPublicSubnetAz2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      CidrBlock: !Ref "PublicSubnetCidrBlock2"
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      MapPublicIpOnLaunch: true # サブネット内のインスタンスに public IP を自動割り当てするか
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-public-subnet-az2
+        - Key: "Description"
+          Value: Private Subnet on AZ-2
+  TestAppPrivateSubnetAz2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      CidrBlock: !Ref "PrivateSubnetCidrBlock2"
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      MapPublicIpOnLaunch: true # サブネット内のインスタンスに public IP を自動割り当てするか
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-private-subnet-az2
+        - Key: "Description"
+          Value: Private Subnet on AZ-2
+
+  # Internet Gateway
+  TestAppInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-igw
+        - Key: "Description"
+          Value: Test App Internet Gateway
+  AttachGateway: # VPC に Internet Gateway をアタッチ
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      InternetGatewayId: !Ref "TestAppInternetGateway"
+
+  # RouteTable
+  # デフォルトで VPC 内の Route が追加されるため、VPC 内の通信は行える
+  # - RouteTable for public subnet
+  TestAppRouteTableForPublicSubnet:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-public-route-table
+        - Key: "Description"
+          Value: Test App Public Route Table for public subnet
+  # - RouteTable for private subnet
+  TestAppRouteTableForPrivateSubnet:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref "TestAppVpc"
+      Tags:
+        - Key: "Name"
+          Value: !Sub ${ProjectName}-${Env}-private-route-table
+        - Key: "Description"
+          Value: Test App Private Route Table for private subnet
+
+  # Route
+  InternetAccessRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref "TestAppRouteTableForPublicSubnet"
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref "TestAppInternetGateway"
+
+  # RouteTableAssociation: サブネットとルートテーブルの関連付け
+  # AZ-1: public, private 1 つずつ
+  TestAppPublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "TestAppPublicSubnetAz1"
+      RouteTableId: !Ref "TestAppRouteTableForPublicSubnet"
+  TestAppPrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "TestAppPrivateSubnetAz1"
+      RouteTableId: !Ref "TestAppRouteTableForPrivateSubnet"
+
+  # AZ-1: public, private 1 つずつ
+  TestAppPublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "TestAppPublicSubnetAz2"
+      RouteTableId: !Ref "TestAppRouteTableForPublicSubnet"
+  TestAppPrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "TestAppPrivateSubnetAz2"
+      RouteTableId: !Ref "TestAppRouteTableForPrivateSubnet"
+
+Outputs:
+  Hello:
+    Description: test output
+    Value: "Hello, world!"
